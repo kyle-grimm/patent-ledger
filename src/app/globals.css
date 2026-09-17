@@ -1,0 +1,54 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: var(--font-plex-sans), ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, "Cascadia Mono", Consolas, monospace;
+
+  --color-paper: #f3f4f0;
+  --color-surface: #ffffff;
+  --color-sunken: #f8f9f6;
+  --color-line: #dcdfd6;
+  --color-line-strong: #c4c8bd;
+  --color-ink: #15171c;
+  --color-muted: #5d636d;
+  --color-faint: #8a9099;
+
+  --color-accent: #1f4fd6;
+  --color-accent-strong: #173ca8;
+  --color-accent-soft: #e7edfc;
+
+  --color-strong: #11734a;
+  --color-strong-soft: #e1f3e9;
+  --color-likely: #8f5d00;
+  --color-likely-soft: #fbf0d6;
+  --color-check: #596170;
+  --color-check-soft: #eceef1;
+  --color-danger: #b42318;
+  --color-danger-soft: #fdecea;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+::selection {
+  background: var(--color-accent-soft);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
