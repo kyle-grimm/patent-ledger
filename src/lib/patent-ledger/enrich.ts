@@ -52,7 +52,7 @@ export async function enrichInventor(
           ? await viaPdl(target, key, req.minLikelihood ?? 6)
           : provider === "apollo"
             ? await viaApollo(target, key)
-            : await viaApify(target, key, req.apify);
+            : await viaApify(target, key, req.apify, req.searchQuery);
       const ms = Date.now() - started;
       if (found.length) {
         candidates.push(...found);
@@ -183,6 +183,7 @@ async function viaApify(
   t: ReturnType<typeof normaliseTarget>,
   token: string,
   cfg: EnrichRequest["apify"],
+  searchQuery?: string,
 ): Promise<Candidate[]> {
   const actorId = (cfg?.actorId || DEFAULT_APIFY_ACTOR).trim().replace("/", "~");
   const location = [t.city, t.state].filter(Boolean).join(", ");
@@ -192,8 +193,15 @@ async function viaApify(
   const searchName = [givenNames[0] || t.firstName.split(/\s+/)[0], t.lastName].filter(Boolean).join(" ");
   // Some people do use every given name on their profile ("Yashar Zeiynali Farid").
   const longName = givenNames.length > 1 ? [...givenNames, t.lastName].join(" ") : undefined;
+  // The patent search's own keywords, added as an extra (not a replacement) query: a soft signal
+  // that helps Google rank the right person when a name+company pair is too common to disambiguate
+  // on its own — common in large engineering orgs. Never required, since a profile's own headline
+  // rarely repeats a patent's exact technical phrasing.
+  const kw = (searchQuery || "").trim();
   const queries = [
+    employer.brand && kw ? `site:linkedin.com/in "${searchName}" ${employer.brand} ${kw}` : undefined,
     employer.brand ? `site:linkedin.com/in "${searchName}" ${employer.brand}` : undefined,
+    !employer.brand && kw ? `site:linkedin.com/in "${searchName}" ${kw}` : undefined,
     `site:linkedin.com/in "${searchName}"`,
     longName ? `site:linkedin.com/in "${longName}"` : undefined,
   ].filter((q): q is string => !!q);
@@ -207,11 +215,15 @@ async function viaApify(
     query,
   };
   const url = `${UPSTREAM.apify}/v2/acts/${encodeURIComponent(actorId)}/run-sync-get-dataset-items?token=${encodeURIComponent(token)}&timeout=90&memory=512&format=json&clean=true`;
+  // Search from the inventor's own country when known (patents give ISO country codes already) —
+  // hard-locking every search to "us" biased/buried results for the large share of inventors on
+  // multinational engineering patents who are based outside the US.
+  const countryCode = (t.country || "us").trim().toLowerCase().slice(0, 2) || "us";
   const googleInput = (qs: string[]): Json => ({
     queries: qs.join("\n"),
     maxPagesPerQuery: 1,
     resultsPerPage: 10,
-    countryCode: "us",
+    countryCode,
     mobileResults: false,
   });
 

@@ -90,6 +90,8 @@ export interface EnrichRequest {
   providers?: EnrichProvider[];
   /** PDL min_likelihood (1–10). Default 6. */
   minLikelihood?: number;
+  /** The patent search's own keywords. Apify adds one extra name+company+keywords query with this. */
+  searchQuery?: string;
   /** Optional custom Apify actor. Defaults to apify~google-search-scraper (site:linkedin.com/in search). */
   apify?: {
     actorId?: string;

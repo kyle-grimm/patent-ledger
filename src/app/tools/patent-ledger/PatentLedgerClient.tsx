@@ -140,6 +140,8 @@ const btnPrimary =
 const btnSecondary =
   "inline-flex items-center justify-center gap-1.5 rounded-md border border-line bg-surface px-3 py-1.5 text-sm font-medium text-ink transition-colors hover:border-line-strong hover:bg-sunken disabled:cursor-not-allowed disabled:opacity-40";
 const btnGhost = "text-xs font-medium text-muted underline-offset-2 hover:text-ink hover:underline";
+const btnGreen =
+  "inline-flex items-center justify-center gap-1.5 rounded-md bg-emerald-600 px-3 py-1 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700";
 
 /* ───────────────────────── component ───────────────────────── */
 
@@ -284,6 +286,7 @@ export default function PatentLedgerClient() {
             providers: settings.providers,
             minLikelihood: settings.minLikelihood,
             apify: { actorId: settings.apifyActorId || undefined, input: apifyInput },
+            searchQuery: query,
           }),
         });
         const data = (await res.json()) as EnrichResponse & { error?: string };
@@ -293,7 +296,7 @@ export default function PatentLedgerClient() {
         setEnrich((s) => ({ ...s, [inv.key]: { status: "error", error: err instanceof Error ? err.message : String(err) } }));
       }
     },
-    [headers, settings],
+    [headers, settings, query],
   );
 
   const visibleInventors = useMemo(() => {
@@ -478,17 +481,22 @@ export default function PatentLedgerClient() {
               </label>
               <label className="block">
                 <span className={labelText}>Max patents</span>
-                <select value={size} onChange={(e) => setSize(Number(e.target.value))} className={input}>
-                  {[
-                    [25, "25 · about 25 seconds"],
-                    [50, "50 · about 1 minute"],
-                    [100, "100 · about 2 minutes"],
-                  ].map(([n, label]) => (
-                    <option key={n} value={n}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
+                <input
+                  type="number"
+                  min={1}
+                  max={100}
+                  step={1}
+                  value={size}
+                  onChange={(e) => setSize(Math.min(100, Math.max(1, Number(e.target.value) || 1)))}
+                  onWheel={(e) => {
+                    // Scroll to step the value up/down, same idea as a native spinner but hover-scrollable.
+                    e.preventDefault();
+                    const delta = e.deltaY < 0 ? 1 : -1;
+                    setSize((s) => Math.min(100, Math.max(1, s + delta)));
+                  }}
+                  className={input}
+                />
+                <span className="mt-1 block text-xs text-faint">1–100 · 25 ≈ 25s, 50 ≈ 1 min, 100 ≈ 2 min</span>
               </label>
             </div>
 
@@ -641,6 +649,7 @@ export default function PatentLedgerClient() {
                           canEnrich={hasEnrichKey}
                           showLocation={hasLocations}
                           inLedger={ledgerUrls}
+                          searchQuery={query}
                           onEnrich={() => void enrichOne(inv)}
                           onChoose={(i) => setEnrich((s) => ({ ...s, [inv.key]: { ...s[inv.key], chosen: i } }))}
                           onSave={(c) => saveToLedger(inv, c)}
@@ -893,6 +902,7 @@ function InventorRow({
   canEnrich,
   showLocation,
   inLedger,
+  searchQuery,
   onEnrich,
   onChoose,
   onSave,
@@ -903,6 +913,7 @@ function InventorRow({
   canEnrich: boolean;
   showLocation: boolean;
   inLedger: Set<string>;
+  searchQuery: string;
   onEnrich: () => void;
   onChoose: (i: number) => void;
   onSave: (c: Candidate) => void;
@@ -911,6 +922,12 @@ function InventorRow({
   const chosen = state?.result?.candidates[state.chosen ?? 0];
   const brand = employerFromAssignee(inv.assignee, inv.fullName).brand;
   const manualSearch = `https://www.google.com/search?q=${encodeURIComponent(`site:linkedin.com/in "${inv.fullName}"${brand ? ` ${brand}` : ""}`)}`;
+  // X-ray search: the broader site:linkedin.com (not just /in/ profiles) paired with the search
+  // keywords and the raw assignee organization name (not the brand-mapped short name), as a
+  // second, differently-scoped manual query alongside the one above.
+  const xraySearch = `https://www.google.com/search?q=${encodeURIComponent(
+    [`site:linkedin.com`, inv.fullName, searchQuery.trim(), inv.assignee].filter(Boolean).join(" "),
+  )}`;
 
   return (
     <tr className="align-top transition-colors hover:bg-sunken/60">
@@ -943,12 +960,17 @@ function InventorRow({
         )}
       </td>
       <td className="px-4 py-3">
-        {(!state || state.status === "idle") && (
-          <button type="button" disabled={!canEnrich} onClick={onEnrich} className={`${btnSecondary} py-1 text-xs`}>
-            <LinkedInIcon />
-            Find LinkedIn
-          </button>
-        )}
+        <div className="flex flex-col items-start gap-1.5">
+          {(!state || state.status === "idle") && (
+            <button type="button" disabled={!canEnrich} onClick={onEnrich} className={`${btnSecondary} py-1 text-xs`}>
+              <LinkedInIcon />
+              Find LinkedIn
+            </button>
+          )}
+          <a href={xraySearch} target="_blank" rel="noreferrer" className={btnGreen}>
+            LinkedIn X-ray Search
+          </a>
+        </div>
         {state?.status === "loading" && (
           <span className="inline-flex items-center gap-2 text-xs text-muted">
             <Spinner /> Looking up…
