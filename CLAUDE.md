@@ -25,6 +25,41 @@ Full technical docs: `docs/patent-ledger.md`. Setup for people: `README.md`.
   ("Venkat" for Venkataramani), transliterated names, people with no LinkedIn. Add company renames
   to `BRAND_ALIASES` in `company.ts`.
 
+## Change log
+
+- **2026-09-17 — LinkedIn X-ray Search, Apify accuracy tuning, Max patents input.** Kyle's fork
+  (his own GitHub/Vercel, not Connor's). Three related-but-separate changes, all in
+  `PatentLedgerClient.tsx` / `enrich.ts` / `types.ts`:
+  - **"LinkedIn X-ray Search"**: a persistent green button under "Find LinkedIn" on every inventor
+    row (visible in every state, not just after a match/no-match) — opens
+    `site:linkedin.com <name> <search keywords> <raw assignee>` in Google in a new tab. Deliberately
+    a manual link, not an automated provider — no cost, no scraping, just a faster path to the same
+    kind of check "Search manually" already did with a narrower `site:linkedin.com/in "name"
+    brand` query. The two links are complementary (broader site scope + raw assignee vs. the
+    brand-mapped one), kept side by side.
+  - **Apify enrichment accuracy**: `viaApify` in `enrich.ts` had `countryCode: "us"` hardcoded on
+    every Google search, even though a large share of inventors on multinational engineering
+    patents (verified against Kyle's own GM battery-patent search: Zhe Li, Qili Su, Haijing Liu, all
+    Shanghai) are outside the US — now derived from the inventor's own `country` field, defaulting
+    to `"us"` only when absent. Also added an extra `name + brand + <patent's own search
+    keywords>` query (purely additive alongside the existing name+brand and name-only queries,
+    never a replacement) to help disambiguate common names within the specific technical field —
+    threaded through as a new `EnrichRequest.searchQuery` field, populated client-side from the
+    same `query` state the patent search box uses. **Verified against a real, hard case (Zhe Li,
+    an extremely common Chinese name)**: the fix correctly returned only "Check"-tier candidates
+    (score 40, name-only match, no company/location evidence) rather than confidently guessing
+    wrong — the scoring gate is working as intended; a name this common will always need manual
+    verification regardless of search targeting. The earlier real test on a distinctive name
+    (Xingcheng Xiao) already scored a confident 83 before any of this session's changes, and
+    remains the more representative case most engineering-patent inventors will hit.
+  - **Max patents**: the old 25/50/100 `<select>` is now a `type="number"` input, `min={1}
+    max={100}`, with a custom `onWheel` handler so hovering + scrolling steps the value (not just
+    the native focused-input scroll behavior) — server-side clamping in `uspto-ppubs.ts`/
+    `google-patents.ts`/`apify-patents.ts` already enforced `[1, 100]`, so no server change needed.
+  - All three verified via `npm run build && npm run smoke` (52/52 checks) after each change, plus
+    real (non-mocked) API calls for the X-ray query shape and the Apify accuracy fix specifically —
+    not just the mocked smoke suite.
+
 ## Auth and keys
 - Hosted: set `PATENT_LEDGER_USERS` (JSON of username → hash from `scripts/hash-password.mjs`)
   and `PATENT_LEDGER_SESSION_SECRET`. Login is then required everywhere; routes re-verify the session
